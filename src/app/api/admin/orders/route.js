@@ -43,7 +43,7 @@ export async function PATCH(request) {
         const user = getUserFromRequest(request);
         if (!user || user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-        const { order_id, status } = await request.json();
+        const { order_id, status, tracking_id, tracking_url } = await request.json();
         const validStatuses = ['pending_verification', 'processing', 'shipped', 'delivered', 'cancelled'];
 
         if (!order_id || !validStatuses.includes(status)) {
@@ -63,7 +63,13 @@ export async function PATCH(request) {
             }
         }
 
-        db.prepare('UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE order_id = ?').run(status, order_id);
+        // Save tracking info when shipping
+        if (status === 'shipped' && (tracking_id || tracking_url)) {
+            db.prepare('UPDATE orders SET status = ?, tracking_id = ?, tracking_url = ?, updated_at = CURRENT_TIMESTAMP WHERE order_id = ?')
+                .run(status, tracking_id || null, tracking_url || null, order_id);
+        } else {
+            db.prepare('UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE order_id = ?').run(status, order_id);
+        }
 
         return NextResponse.json({ success: true, status });
     } catch (err) {

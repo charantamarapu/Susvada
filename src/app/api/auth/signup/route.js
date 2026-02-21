@@ -16,6 +16,13 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Email already registered' }, { status: 409 });
         }
 
+        if (phone) {
+            const existingPhone = db.prepare('SELECT id FROM users WHERE phone = ?').get(phone);
+            if (existingPhone) {
+                return NextResponse.json({ error: 'Phone number already registered' }, { status: 409 });
+            }
+        }
+
         const password_hash = hashPassword(password);
         const result = db.prepare(
             'INSERT INTO users (name, email, password_hash, phone) VALUES (?, ?, ?, ?)'

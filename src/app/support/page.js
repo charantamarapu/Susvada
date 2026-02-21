@@ -101,7 +101,14 @@ export default function SupportPage() {
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Subject *</label>
-                                <input className="form-input" value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} required />
+                                <select className="form-input" value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} required>
+                                    <option value="" disabled>Select a topic</option>
+                                    <option value="Order Status">Order Status</option>
+                                    <option value="Product Inquiry">Product Inquiry</option>
+                                    <option value="Login / Account Issue">Login / Account Issue</option>
+                                    <option value="Returns / Refunds">Returns / Refunds</option>
+                                    <option value="Other">Other</option>
+                                </select>
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Message *</label>

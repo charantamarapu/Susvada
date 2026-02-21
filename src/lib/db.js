@@ -31,6 +31,7 @@ function initializeDb(database) {
       password_hash TEXT NOT NULL,
       phone TEXT,
       role TEXT DEFAULT 'customer' CHECK(role IN ('customer', 'admin')),
+      is_blocked INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -91,6 +92,8 @@ function initializeDb(database) {
       telegram_message_id TEXT,
       cancel_reason TEXT,
       refund_status TEXT DEFAULT 'none' CHECK(refund_status IN ('none', 'pending', 'processed')),
+      tracking_id TEXT,
+      tracking_url TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)

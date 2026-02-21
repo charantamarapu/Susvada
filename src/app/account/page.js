@@ -14,6 +14,23 @@ const STATUS_MAP = {
     'cancelled': { label: 'Cancelled', class: 'status-cancelled', icon: '❌' },
 };
 
+function TrackingIdDisplay({ trackingId }) {
+    const [copied, setCopied] = useState(false);
+    return (
+        <code
+            style={{ cursor: 'pointer', background: 'var(--bg-card)', border: '1px solid rgba(197,165,90,0.3)', padding: '0.15rem 0.4rem', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+            onClick={() => {
+                navigator.clipboard.writeText(trackingId);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            }}
+            title="Click to copy tracking ID"
+        >
+            {trackingId} <span style={{ fontSize: '0.8rem' }}>{copied ? '✅' : '📋'}</span>
+        </code>
+    );
+}
+
 function getRefundInfo(status) {
     if (status === 'pending_verification') return { percent: 100, text: 'You will receive a full 100% refund.' };
     if (status === 'processing') return { percent: 75, text: 'Since your order is being processed, you are eligible for a 75% refund.' };
@@ -28,10 +45,14 @@ export default function AccountPage() {
     const [tab, setTab] = useState('orders');
     const [addresses, setAddresses] = useState([]);
 
-    // Cancel modal state
     const [cancelModal, setCancelModal] = useState(null);
     const [cancelReason, setCancelReason] = useState('');
-    const [paymentDetails, setPaymentDetails] = useState('');
+    const [refundMethod, setRefundMethod] = useState('upi');
+    const [paymentName, setPaymentName] = useState('');
+    const [paymentDetails, setPaymentDetails] = useState(''); // UPI ID
+    const [bankAccount, setBankAccount] = useState('');
+    const [bankIfsc, setBankIfsc] = useState('');
+    const [bankName, setBankName] = useState('');
     const [cancelLoading, setCancelLoading] = useState(false);
     const [cancelResult, setCancelResult] = useState(null);
 
@@ -61,18 +82,32 @@ export default function AccountPage() {
     const openCancelModal = (order) => {
         setCancelModal(order);
         setCancelReason('');
+        setRefundMethod('upi');
+        setPaymentName('');
         setPaymentDetails('');
+        setBankAccount('');
+        setBankIfsc('');
+        setBankName('');
         setCancelResult(null);
     };
 
     const submitCancellation = async () => {
         if (!cancelReason.trim()) return alert('Please provide a reason for cancellation.');
-        if (!paymentDetails.trim()) return alert('Please provide your UPI ID or Bank Account details for refund.');
+        if (!paymentName.trim()) return alert('Please provide the Name exactly as it appears on your Bank/UPI account.');
+
+        let finalPaymentDetails = '';
+        if (refundMethod === 'upi') {
+            if (!paymentDetails.trim()) return alert('Please provide your UPI ID.');
+            finalPaymentDetails = `UPI (${paymentName}): ${paymentDetails}`;
+        } else {
+            if (!bankAccount.trim() || !bankIfsc.trim() || !bankName.trim()) return alert('Please fill in all Bank Account details (A/C No, IFSC, and Bank Name).');
+            finalPaymentDetails = `BANK (${paymentName}): A/C ${bankAccount}, IFSC ${bankIfsc}, ${bankName}`;
+        }
 
         setCancelLoading(true);
         const res = await apiFetch(`/api/orders/${cancelModal.order_id}/cancel`, {
             method: 'POST',
-            body: JSON.stringify({ reason: cancelReason, payment_details: paymentDetails }),
+            body: JSON.stringify({ reason: cancelReason, payment_details: finalPaymentDetails }),
         });
         const data = await res.json();
         setCancelLoading(false);
@@ -170,6 +205,31 @@ export default function AccountPage() {
                                                         {order.status === 'cancelled' && order.refund_status === 'processed' && (
                                                             <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(76,175,80,0.1)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--success)' }}>
                                                                 ✅ Refund has been processed successfully.
+                                                            </div>
+                                                        )}
+
+                                                        {/* Shipment Tracking */}
+                                                        {(order.status === 'shipped' || order.status === 'delivered') && order.tracking_id && (
+                                                            <div style={{
+                                                                marginTop: '0.75rem', padding: '0.75rem',
+                                                                background: 'rgba(33,150,243,0.08)', borderRadius: '8px',
+                                                                border: '1px solid rgba(33,150,243,0.15)',
+                                                                fontSize: '0.85rem'
+                                                            }}>
+                                                                <div style={{ fontWeight: 600, marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                                    📦 Tracking ID: <TrackingIdDisplay trackingId={order.tracking_id} />
+                                                                </div>
+                                                                {order.tracking_url && (
+                                                                    <a
+                                                                        href={order.tracking_url}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="btn btn-sm btn-primary"
+                                                                        style={{ marginTop: '0.5rem', display: 'inline-block', fontSize: '0.8rem' }}
+                                                                    >
+                                                                        🔗 Track Shipment
+                                                                    </a>
+                                                                )}
                                                             </div>
                                                         )}
 
@@ -316,13 +376,62 @@ export default function AccountPage() {
                                 </div>
 
                                 <div className="form-group">
-                                    <label className="form-label">UPI ID or Bank Account Details *</label>
-                                    <input
-                                        className="form-input"
-                                        placeholder="e.g., name@upi or A/C No + IFSC"
-                                        value={paymentDetails}
-                                        onChange={e => setPaymentDetails(e.target.value)}
-                                    />
+                                    <label className="form-label">Refund Method *</label>
+                                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                                        <button
+                                            className={`btn btn-sm ${refundMethod === 'upi' ? 'btn-primary' : 'btn-outline'}`}
+                                            style={{ flex: 1 }}
+                                            onClick={() => { setRefundMethod('upi'); setPaymentDetails(''); }}
+                                        >
+                                            UPI ID
+                                        </button>
+                                        <button
+                                            className={`btn btn-sm ${refundMethod === 'bank' ? 'btn-primary' : 'btn-outline'}`}
+                                            style={{ flex: 1 }}
+                                            onClick={() => { setRefundMethod('bank'); setPaymentDetails(''); }}
+                                        >
+                                            Bank Account
+                                        </button>
+                                    </div>
+                                    <div style={{ marginBottom: '1rem' }}>
+                                        <input
+                                            className="form-input"
+                                            placeholder="Name as registered on Bank/UPI"
+                                            value={paymentName}
+                                            onChange={e => setPaymentName(e.target.value)}
+                                        />
+                                    </div>
+
+                                    {refundMethod === 'upi' ? (
+                                        <input
+                                            className="form-input"
+                                            placeholder="UPI ID (e.g., name@okbank)"
+                                            value={paymentDetails}
+                                            onChange={e => setPaymentDetails(e.target.value)}
+                                        />
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                            <input
+                                                className="form-input"
+                                                placeholder="Account Number"
+                                                value={bankAccount}
+                                                onChange={e => setBankAccount(e.target.value)}
+                                            />
+                                            <input
+                                                className="form-input"
+                                                placeholder="IFSC Code (e.g., SBIN0001234)"
+                                                value={bankIfsc}
+                                                onChange={e => setBankIfsc(e.target.value)}
+                                            />
+                                            <input
+                                                className="form-input"
+                                                placeholder="Bank Name (e.g., State Bank of India)"
+                                                value={bankName}
+                                                onChange={e => setBankName(e.target.value)}
+                                            />
+                                        </div>
+                                    )}
+
                                     <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
                                         Required for processing your refund within 24 hours.
                                     </div>

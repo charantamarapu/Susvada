@@ -10,6 +10,7 @@ export default function SignupPage() {
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const { signup } = useAuth();
     const router = useRouter();
@@ -19,6 +20,7 @@ export default function SignupPage() {
         e.preventDefault();
         if (!name || !email || !password) { addToast('Please fill all required fields', 'error'); return; }
         if (password.length < 6) { addToast('Password must be at least 6 characters', 'error'); return; }
+        if (password !== confirmPassword) { addToast('Passwords do not match', 'error'); return; }
         setLoading(true);
         const result = await signup(name, email, password, phone);
         setLoading(false);
@@ -58,6 +60,24 @@ export default function SignupPage() {
                     <div className="form-group">
                         <label className="form-label">Password *</label>
                         <input type="password" className="form-input" placeholder="Min 6 characters" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Confirm Password *</label>
+                        <input
+                            type="password"
+                            className="form-input"
+                            placeholder="Re-enter your password"
+                            value={confirmPassword}
+                            onChange={e => setConfirmPassword(e.target.value)}
+                            required
+                            minLength={6}
+                            style={confirmPassword && password !== confirmPassword ? { borderColor: 'var(--danger)' } : {}}
+                        />
+                        {confirmPassword && password !== confirmPassword && (
+                            <div style={{ fontSize: '0.8rem', color: 'var(--danger)', marginTop: '0.25rem' }}>
+                                Passwords do not match
+                            </div>
+                        )}
                     </div>
                     <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
                         {loading ? 'Creating Account...' : 'Create Account'}

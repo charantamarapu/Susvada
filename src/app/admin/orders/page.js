@@ -12,6 +12,23 @@ const STATUS_MAP = {
     cancelled: { label: 'Cancelled', class: 'status-cancelled', icon: '❌' },
 };
 
+function TrackingIdDisplay({ trackingId }) {
+    const [copied, setCopied] = useState(false);
+    return (
+        <code
+            style={{ cursor: 'pointer', background: 'var(--bg-card)', border: '1px solid rgba(197,165,90,0.3)', padding: '0.15rem 0.4rem', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+            onClick={() => {
+                navigator.clipboard.writeText(trackingId);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            }}
+            title="Click to copy tracking ID"
+        >
+            {trackingId} <span style={{ fontSize: '0.8rem' }}>{copied ? '✅' : '📋'}</span>
+        </code>
+    );
+}
+
 export default function AdminOrdersPage() {
     const { apiFetch } = useAuth();
     const [orders, setOrders] = useState([]);
@@ -19,6 +36,11 @@ export default function AdminOrdersPage() {
     const [filterStatus, setFilterStatus] = useState('');
     const { toasts, addToast, removeToast } = useToast();
     const [refunds, setRefunds] = useState([]);
+
+    // Shipped modal state
+    const [shipModal, setShipModal] = useState(null); // order_id
+    const [trackingId, setTrackingId] = useState('');
+    const [trackingUrl, setTrackingUrl] = useState('');
 
     const fetchOrders = async () => {
         let url = '/api/admin/orders';
@@ -34,10 +56,10 @@ export default function AdminOrdersPage() {
 
     useEffect(() => { fetchOrders(); }, [filterStatus]);
 
-    const updateStatus = async (orderId, status) => {
+    const updateStatus = async (orderId, status, extraData = {}) => {
         const res = await apiFetch('/api/admin/orders', {
             method: 'PATCH',
-            body: JSON.stringify({ order_id: orderId, status }),
+            body: JSON.stringify({ order_id: orderId, status, ...extraData }),
         });
         if (res.ok) {
             addToast(`Order ${orderId} → ${STATUS_MAP[status].label}`);
@@ -45,6 +67,24 @@ export default function AdminOrdersPage() {
         } else {
             addToast('Failed to update', 'error');
         }
+    };
+
+    const handleStatusChange = (orderId, newStatus) => {
+        if (newStatus === 'shipped') {
+            setShipModal(orderId);
+            setTrackingId('');
+            setTrackingUrl('');
+        } else {
+            updateStatus(orderId, newStatus);
+        }
+    };
+
+    const submitShipped = () => {
+        updateStatus(shipModal, 'shipped', {
+            tracking_id: trackingId,
+            tracking_url: trackingUrl,
+        });
+        setShipModal(null);
     };
 
     const markRefundProcessed = async (refundId) => {
@@ -60,7 +100,6 @@ export default function AdminOrdersPage() {
         }
     };
 
-    // Get refund info for an order
     const getRefund = (orderId) => refunds.find(r => r.order_id === orderId);
 
     return (
@@ -149,12 +188,25 @@ export default function AdminOrdersPage() {
                                                     className="input"
                                                     style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem', width: 'auto' }}
                                                     value={order.status}
-                                                    onChange={(e) => updateStatus(order.order_id, e.target.value)}
+                                                    onChange={(e) => handleStatusChange(order.order_id, e.target.value)}
                                                 >
                                                     {STATUSES.map(s => (
                                                         <option key={s} value={s}>{STATUS_MAP[s].label}</option>
                                                     ))}
                                                 </select>
+                                            )}
+
+                                            {/* Tracking Info */}
+                                            {order.tracking_id && (
+                                                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                    📦 <TrackingIdDisplay trackingId={order.tracking_id} />
+                                                    {order.tracking_url && (
+                                                        <a href={order.tracking_url} target="_blank" rel="noopener noreferrer"
+                                                            style={{ marginLeft: '0.5rem', color: 'var(--gold)', fontSize: '0.75rem' }}>
+                                                            Track →
+                                                        </a>
+                                                    )}
+                                                </div>
                                             )}
 
                                             {/* Refund Section */}
@@ -190,6 +242,57 @@ export default function AdminOrdersPage() {
                         })}
                     </tbody>
                 </table>
+            )}
+
+            {/* Shipped Modal */}
+            {shipModal && (
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+                }} onClick={() => setShipModal(null)}>
+                    <div style={{
+                        background: 'var(--bg-card)', borderRadius: '16px', padding: '2rem',
+                        maxWidth: '450px', width: '100%',
+                        border: '1px solid rgba(197,165,90,0.15)'
+                    }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ marginBottom: '0.25rem' }}>🚚 Ship Order {shipModal}</h3>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+                            Enter tracking details so customers can track their shipment.
+                        </p>
+
+                        <div className="form-group">
+                            <label className="form-label">Tracking ID *</label>
+                            <input
+                                className="form-input"
+                                placeholder="e.g., AWB123456789"
+                                value={trackingId}
+                                onChange={e => setTrackingId(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label">Tracking URL</label>
+                            <input
+                                className="form-input"
+                                placeholder="e.g., https://www.delhivery.com/track/..."
+                                value={trackingUrl}
+                                onChange={e => setTrackingUrl(e.target.value)}
+                            />
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                                Courier tracking page URL. Customer can click this to track their order.
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+                            <button className="btn btn-outline" onClick={() => setShipModal(null)} style={{ flex: 1 }}>
+                                Cancel
+                            </button>
+                            <button className="btn btn-primary" onClick={submitShipped} disabled={!trackingId.trim()} style={{ flex: 1 }}>
+                                ✅ Confirm Shipped
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

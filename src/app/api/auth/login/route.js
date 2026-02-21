@@ -17,6 +17,10 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
         }
 
+        if (user.is_blocked) {
+            return NextResponse.json({ error: 'Your account has been suspended. Please contact support.' }, { status: 403 });
+        }
+
         const token = generateToken(user);
 
         return NextResponse.json({

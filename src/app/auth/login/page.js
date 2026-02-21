@@ -48,10 +48,19 @@ export default function LoginPage() {
                         <label className="form-label">Password</label>
                         <input type="password" className="form-input" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
                     </div>
+                    <div style={{ textAlign: 'right', marginBottom: '1rem' }}>
+                        <Link href="/auth/forgot-password" style={{ fontSize: '0.85rem', color: 'var(--gold)' }}>Forgot Password?</Link>
+                    </div>
                     <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
                         {loading ? 'Signing in...' : 'Sign In'}
                     </button>
                 </form>
+
+                <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                    <Link href="/support" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textDecoration: 'none' }}>
+                        🛟 Need help? Contact Support
+                    </Link>
+                </div>
 
                 <div className="auth-footer">
                     Don't have an account? <Link href="/auth/signup">Create one</Link>
