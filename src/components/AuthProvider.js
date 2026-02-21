@@ -41,6 +41,13 @@ export function AuthProvider({ children }) {
         }
     };
 
+    const loginWithToken = async (tokenStr) => {
+        localStorage.setItem('susvada_token', tokenStr);
+        setToken(tokenStr);
+        await fetchUser(tokenStr);
+        return { success: true };
+    };
+
     const login = async (email, password) => {
         const res = await fetch('/api/auth/login', {
             method: 'POST',
@@ -89,7 +96,7 @@ export function AuthProvider({ children }) {
     }, [token]);
 
     return (
-        <AuthContext.Provider value={{ user, token, loading, login, signup, logout, apiFetch }}>
+        <AuthContext.Provider value={{ user, token, loading, login, loginWithToken, signup, logout, apiFetch }}>
             {children}
         </AuthContext.Provider>
     );

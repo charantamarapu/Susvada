@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { useAuth } from '@/components/AuthProvider';
+import { ToastContainer, useToast } from '@/components/Toast';
 
 const STATUS_MAP = {
     'pending_verification': { label: 'Pending Verification', class: 'status-pending', icon: '⏳' },
@@ -55,6 +56,11 @@ export default function AccountPage() {
     const [bankName, setBankName] = useState('');
     const [cancelLoading, setCancelLoading] = useState(false);
     const [cancelResult, setCancelResult] = useState(null);
+
+    const { toasts, addToast, removeToast } = useToast();
+    const [editPhone, setEditPhone] = useState(false);
+    const [newPhone, setNewPhone] = useState(user?.phone || '');
+    const [updatingPhone, setUpdatingPhone] = useState(false);
 
     useEffect(() => {
         if (!user) { router.push('/auth/login'); return; }
@@ -130,8 +136,36 @@ export default function AccountPage() {
 
     const canCancel = (status) => status === 'pending_verification' || status === 'processing';
 
+    const handleUpdatePhone = async () => {
+        if (!newPhone.trim()) return addToast('Please enter a phone number', 'error');
+        setUpdatingPhone(true);
+        try {
+            const res = await apiFetch('/api/auth/me', {
+                method: 'PATCH',
+                body: JSON.stringify({ phone: newPhone }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                addToast('Phone number updated successfully', 'success');
+                setEditPhone(false);
+                // The user object in AuthContext won't update automatically 
+                // unless we refetch or update state, but fetchUser in AuthProvider
+                // handles initial load. For better DX, we'd ideally update context.
+                // However, the simplest fix is to reload or tell user it will show on refresh.
+                window.location.reload();
+            } else {
+                addToast(data.error || 'Failed to update phone number', 'error');
+            }
+        } catch (err) {
+            addToast('An error occurred', 'error');
+        } finally {
+            setUpdatingPhone(false);
+        }
+    };
+
     return (
         <>
+            <ToastContainer toasts={toasts} removeToast={removeToast} />
             <Header />
             <main className="main-content">
                 <div className="page-header">
@@ -297,7 +331,44 @@ export default function AccountPage() {
                                         </div>
                                         <div className="form-group">
                                             <label className="form-label">Phone</label>
-                                            <input className="form-input" value={user.phone || 'Not set'} disabled />
+                                            {editPhone ? (
+                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    <input
+                                                        className="form-input"
+                                                        value={newPhone}
+                                                        onChange={e => setNewPhone(e.target.value)}
+                                                        placeholder="Enter phone number"
+                                                        style={{ flex: 1 }}
+                                                    />
+                                                    <button
+                                                        className="btn btn-sm btn-primary"
+                                                        onClick={handleUpdatePhone}
+                                                        disabled={updatingPhone}
+                                                    >
+                                                        {updatingPhone ? '...' : 'Save'}
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-sm btn-outline"
+                                                        onClick={() => { setEditPhone(false); setNewPhone(user.phone || ''); }}
+                                                        disabled={updatingPhone}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                                    <span style={{ color: user.phone ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                                                        {user.phone || 'Not set'}
+                                                    </span>
+                                                    <button
+                                                        className="btn btn-sm btn-outline"
+                                                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+                                                        onClick={() => { setEditPhone(true); setNewPhone(user.phone || ''); }}
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
 
                                     </div>
