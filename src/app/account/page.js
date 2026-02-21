@@ -14,6 +14,12 @@ const STATUS_MAP = {
     'cancelled': { label: 'Cancelled', class: 'status-cancelled', icon: '❌' },
 };
 
+function getRefundInfo(status) {
+    if (status === 'pending_verification') return { percent: 100, text: 'You will receive a full 100% refund.' };
+    if (status === 'processing') return { percent: 75, text: 'Since your order is being processed, you are eligible for a 75% refund.' };
+    return { percent: 0, text: 'This order cannot be cancelled at this stage.' };
+}
+
 export default function AccountPage() {
     const { user, apiFetch, logout } = useAuth();
     const router = useRouter();
@@ -21,6 +27,13 @@ export default function AccountPage() {
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState('orders');
     const [addresses, setAddresses] = useState([]);
+
+    // Cancel modal state
+    const [cancelModal, setCancelModal] = useState(null);
+    const [cancelReason, setCancelReason] = useState('');
+    const [paymentDetails, setPaymentDetails] = useState('');
+    const [cancelLoading, setCancelLoading] = useState(false);
+    const [cancelResult, setCancelResult] = useState(null);
 
     useEffect(() => {
         if (!user) { router.push('/auth/login'); return; }
@@ -45,13 +58,31 @@ export default function AccountPage() {
         }
     };
 
-    const cancelOrder = async (orderId) => {
-        if (!confirm('Cancel this order?')) return;
-        const res = await apiFetch(`/api/orders/${orderId}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ action: 'cancel' }),
+    const openCancelModal = (order) => {
+        setCancelModal(order);
+        setCancelReason('');
+        setPaymentDetails('');
+        setCancelResult(null);
+    };
+
+    const submitCancellation = async () => {
+        if (!cancelReason.trim()) return alert('Please provide a reason for cancellation.');
+        if (!paymentDetails.trim()) return alert('Please provide your UPI ID or Bank Account details for refund.');
+
+        setCancelLoading(true);
+        const res = await apiFetch(`/api/orders/${cancelModal.order_id}/cancel`, {
+            method: 'POST',
+            body: JSON.stringify({ reason: cancelReason, payment_details: paymentDetails }),
         });
-        if (res.ok) fetchOrders();
+        const data = await res.json();
+        setCancelLoading(false);
+
+        if (res.ok) {
+            setCancelResult(data);
+            fetchOrders();
+        } else {
+            alert(data.error || 'Failed to cancel order.');
+        }
     };
 
     const deleteAddress = async (id) => {
@@ -61,6 +92,8 @@ export default function AccountPage() {
     };
 
     if (!user) return null;
+
+    const canCancel = (status) => status === 'pending_verification' || status === 'processing';
 
     return (
         <>
@@ -124,10 +157,21 @@ export default function AccountPage() {
 
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                             <strong style={{ color: 'var(--gold-dark)', fontSize: '1.1rem' }}>₹{order.total.toFixed(2)}</strong>
-                                                            {order.status === 'pending_verification' && (
-                                                                <button className="btn btn-sm btn-danger" onClick={() => cancelOrder(order.order_id)}>Cancel Order</button>
+                                                            {canCancel(order.status) && (
+                                                                <button className="btn btn-sm btn-danger" onClick={() => openCancelModal(order)}>Cancel Order</button>
                                                             )}
                                                         </div>
+
+                                                        {order.status === 'cancelled' && order.refund_status === 'pending' && (
+                                                            <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(255,193,7,0.1)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--gold-dark)' }}>
+                                                                💸 Refund is being processed. You'll receive it within 24 hours.
+                                                            </div>
+                                                        )}
+                                                        {order.status === 'cancelled' && order.refund_status === 'processed' && (
+                                                            <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(76,175,80,0.1)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--success)' }}>
+                                                                ✅ Refund has been processed successfully.
+                                                            </div>
+                                                        )}
 
                                                         {order.utr && (
                                                             <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
@@ -204,6 +248,99 @@ export default function AccountPage() {
                 </div>
             </main>
             <Footer />
+
+            {/* Cancel Order Modal */}
+            {cancelModal && (
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+                }} onClick={() => !cancelLoading && setCancelModal(null)}>
+                    <div style={{
+                        background: 'var(--bg-card)', borderRadius: '16px', padding: '2rem',
+                        maxWidth: '500px', width: '100%', maxHeight: '90vh', overflowY: 'auto',
+                        border: '1px solid rgba(197,165,90,0.15)'
+                    }} onClick={e => e.stopPropagation()}>
+
+                        {cancelResult ? (
+                            /* Success State */
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
+                                <h3 style={{ marginBottom: '0.5rem' }}>Order Cancelled</h3>
+                                {cancelResult.refund_percentage > 0 ? (
+                                    <>
+                                        <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                                            Your refund of <strong style={{ color: 'var(--gold-dark)' }}>₹{cancelResult.refund_amount.toFixed(2)}</strong> ({cancelResult.refund_percentage}%) will be processed within 24 hours.
+                                        </p>
+                                    </>
+                                ) : (
+                                    <p style={{ color: 'var(--text-muted)' }}>Your order has been cancelled.</p>
+                                )}
+                                <button className="btn btn-primary" onClick={() => setCancelModal(null)} style={{ marginTop: '1rem' }}>Done</button>
+                            </div>
+                        ) : (
+                            /* Form State */
+                            <>
+                                <h3 style={{ marginBottom: '0.25rem' }}>Cancel Order {cancelModal.order_id}</h3>
+                                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+                                    Please review the cancellation details below.
+                                </p>
+
+                                {/* Refund Info Box */}
+                                {(() => {
+                                    const info = getRefundInfo(cancelModal.status);
+                                    const refundAmt = (cancelModal.total * info.percent) / 100;
+                                    return (
+                                        <div style={{
+                                            padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem',
+                                            background: info.percent > 0 ? 'rgba(76,175,80,0.08)' : 'rgba(244,67,54,0.08)',
+                                            border: `1px solid ${info.percent > 0 ? 'rgba(76,175,80,0.2)' : 'rgba(244,67,54,0.2)'}`
+                                        }}>
+                                            <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                                                {info.percent > 0 ? `💸 ${info.percent}% Refund — ₹${refundAmt.toFixed(2)}` : '⚠️ No Refund'}
+                                            </div>
+                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{info.text}</div>
+                                        </div>
+                                    );
+                                })()}
+
+                                <div className="form-group">
+                                    <label className="form-label">Reason for cancellation *</label>
+                                    <select className="form-input" value={cancelReason} onChange={e => setCancelReason(e.target.value)}>
+                                        <option value="">Select a reason</option>
+                                        <option value="Changed my mind">Changed my mind</option>
+                                        <option value="Ordered by mistake">Ordered by mistake</option>
+                                        <option value="Found a better price">Found a better price</option>
+                                        <option value="Delivery date too late">Delivery date too late</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">UPI ID or Bank Account Details *</label>
+                                    <input
+                                        className="form-input"
+                                        placeholder="e.g., name@upi or A/C No + IFSC"
+                                        value={paymentDetails}
+                                        onChange={e => setPaymentDetails(e.target.value)}
+                                    />
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                                        Required for processing your refund within 24 hours.
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+                                    <button className="btn btn-outline" onClick={() => setCancelModal(null)} disabled={cancelLoading} style={{ flex: 1 }}>
+                                        Keep Order
+                                    </button>
+                                    <button className="btn btn-danger" onClick={submitCancellation} disabled={cancelLoading} style={{ flex: 1 }}>
+                                        {cancelLoading ? 'Cancelling...' : 'Confirm Cancellation'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
         </>
     );
 }

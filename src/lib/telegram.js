@@ -88,20 +88,46 @@ async function answerCallbackQuery(callbackQueryId, text) {
     }
 }
 
-async function editMessageText(chatId, messageId, newText) {
+async function editMessageText(chatId, messageId, newText, replyMarkup = null) {
     try {
+        const body = {
+            chat_id: chatId,
+            message_id: parseInt(messageId),
+            text: newText,
+            parse_mode: 'Markdown',
+        };
+        if (replyMarkup) {
+            body.reply_markup = replyMarkup;
+        }
+
         await fetch(`${TELEGRAM_API}/editMessageText`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: chatId,
-                message_id: parseInt(messageId),
-                text: newText,
-                parse_mode: 'Markdown',
-            }),
+            body: JSON.stringify(body),
         });
     } catch (err) {
         console.error('[Telegram] Edit message error:', err.message);
+    }
+}
+
+async function sendMessage(chatId, text, replyMarkup = null) {
+    try {
+        const body = {
+            chat_id: chatId,
+            text: text,
+            parse_mode: 'Markdown',
+        };
+        if (replyMarkup) {
+            body.reply_markup = replyMarkup;
+        }
+
+        await fetch(`${TELEGRAM_API}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+    } catch (err) {
+        console.error('[Telegram] Send message error:', err.message);
     }
 }
 
@@ -109,5 +135,6 @@ module.exports = {
     sendOrderNotification,
     answerCallbackQuery,
     editMessageText,
+    sendMessage,
     ADMIN_CHAT_ID,
 };

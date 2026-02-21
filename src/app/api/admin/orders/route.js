@@ -28,7 +28,10 @@ export async function GET(request) {
             address: JSON.parse(o.address),
         }));
 
-        return NextResponse.json({ orders: parsed });
+        // Also fetch all refunds
+        const refunds = db.prepare('SELECT * FROM refunds ORDER BY created_at DESC').all();
+
+        return NextResponse.json({ orders: parsed, refunds });
     } catch (err) {
         console.error('Admin orders error:', err);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

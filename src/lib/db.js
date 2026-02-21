@@ -89,8 +89,24 @@ function initializeDb(database) {
       address TEXT NOT NULL,
       notes TEXT,
       telegram_message_id TEXT,
+      cancel_reason TEXT,
+      refund_status TEXT DEFAULT 'none' CHECK(refund_status IN ('none', 'pending', 'processed')),
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS refunds (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id TEXT NOT NULL,
+      user_id INTEGER NOT NULL,
+      amount REAL NOT NULL,
+      percentage INTEGER NOT NULL,
+      payment_details TEXT NOT NULL,
+      status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'processed')),
+      processed_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (order_id) REFERENCES orders(order_id),
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
 

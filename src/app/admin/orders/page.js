@@ -18,6 +18,7 @@ export default function AdminOrdersPage() {
     const [loading, setLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState('');
     const { toasts, addToast, removeToast } = useToast();
+    const [refunds, setRefunds] = useState([]);
 
     const fetchOrders = async () => {
         let url = '/api/admin/orders';
@@ -26,6 +27,7 @@ export default function AdminOrdersPage() {
         if (res.ok) {
             const data = await res.json();
             setOrders(data.orders);
+            if (data.refunds) setRefunds(data.refunds);
         }
         setLoading(false);
     };
@@ -44,6 +46,22 @@ export default function AdminOrdersPage() {
             addToast('Failed to update', 'error');
         }
     };
+
+    const markRefundProcessed = async (refundId) => {
+        const res = await apiFetch('/api/admin/refunds', {
+            method: 'PATCH',
+            body: JSON.stringify({ refund_id: refundId }),
+        });
+        if (res.ok) {
+            addToast('Refund marked as processed ✅');
+            fetchOrders();
+        } else {
+            addToast('Failed to update refund', 'error');
+        }
+    };
+
+    // Get refund info for an order
+    const getRefund = (orderId) => refunds.find(r => r.order_id === orderId);
 
     return (
         <div>
@@ -89,9 +107,17 @@ export default function AdminOrdersPage() {
                     <tbody>
                         {orders.map(order => {
                             const st = STATUS_MAP[order.status] || STATUS_MAP.pending_verification;
+                            const refund = getRefund(order.order_id);
                             return (
                                 <tr key={order.id}>
-                                    <td><strong>{order.order_id}</strong></td>
+                                    <td>
+                                        <strong>{order.order_id}</strong>
+                                        {order.cancel_reason && (
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--danger)', marginTop: '0.25rem' }}>
+                                                📝 {order.cancel_reason}
+                                            </div>
+                                        )}
+                                    </td>
                                     <td>
                                         <div>{order.address.name}</div>
                                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{order.address.phone}</div>
@@ -112,19 +138,50 @@ export default function AdminOrdersPage() {
                                             </div>
                                         )}
                                     </td>
-                                    <td>
-                                        <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-                                            {order.status === 'pending_verification' && (
-                                                <>
-                                                    <button className="btn btn-sm btn-primary" onClick={() => updateStatus(order.order_id, 'processing')}>✅ Confirm</button>
-                                                    <button className="btn btn-sm btn-danger" onClick={() => updateStatus(order.order_id, 'cancelled')}>❌ Reject</button>
-                                                </>
+                                    <td style={{ verticalAlign: 'middle' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                            {(refund && refund.status === 'processed') || order.status === 'delivered' ? (
+                                                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                                    {order.status === 'delivered' ? '✅ Completed' : '🔒 Refunded — Closed'}
+                                                </span>
+                                            ) : (
+                                                <select
+                                                    className="input"
+                                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem', width: 'auto' }}
+                                                    value={order.status}
+                                                    onChange={(e) => updateStatus(order.order_id, e.target.value)}
+                                                >
+                                                    {STATUSES.map(s => (
+                                                        <option key={s} value={s}>{STATUS_MAP[s].label}</option>
+                                                    ))}
+                                                </select>
                                             )}
-                                            {order.status === 'processing' && (
-                                                <button className="btn btn-sm btn-secondary" onClick={() => updateStatus(order.order_id, 'shipped')}>🚚 Ship</button>
-                                            )}
-                                            {order.status === 'shipped' && (
-                                                <button className="btn btn-sm" style={{ background: 'var(--success)', color: 'white' }} onClick={() => updateStatus(order.order_id, 'delivered')}>✅ Delivered</button>
+
+                                            {/* Refund Section */}
+                                            {refund && (
+                                                <div style={{
+                                                    padding: '0.5rem', borderRadius: '8px', fontSize: '0.8rem',
+                                                    background: refund.status === 'pending' ? 'rgba(255,193,7,0.1)' : 'rgba(76,175,80,0.1)',
+                                                    border: `1px solid ${refund.status === 'pending' ? 'rgba(255,193,7,0.3)' : 'rgba(76,175,80,0.3)'}`
+                                                }}>
+                                                    <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                                                        💸 Refund: ₹{refund.amount.toFixed(2)} ({refund.percentage}%)
+                                                    </div>
+                                                    <div style={{ marginBottom: '0.25rem' }}>
+                                                        🏦 <code>{refund.payment_details}</code>
+                                                    </div>
+                                                    {refund.status === 'pending' ? (
+                                                        <button
+                                                            className="btn btn-sm"
+                                                            style={{ background: 'var(--success)', color: 'white', fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
+                                                            onClick={() => markRefundProcessed(refund.id)}
+                                                        >
+                                                            ✅ Mark as Refunded
+                                                        </button>
+                                                    ) : (
+                                                        <span style={{ color: 'var(--success)', fontWeight: 600 }}>✅ Refunded</span>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
                                     </td>

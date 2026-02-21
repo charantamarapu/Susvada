@@ -34,6 +34,7 @@ export default function Footer() {
 
                     <div className="footer-col">
                         <h4>Help</h4>
+                        <Link href="/faq">FAQ & Refund Policy</Link>
                         <Link href="/support">Contact Us</Link>
                         <a href="https://wa.me/919999999999" target="_blank" rel="noopener noreferrer">WhatsApp</a>
                         <a href="mailto:support@susvada.com">Email</a>
