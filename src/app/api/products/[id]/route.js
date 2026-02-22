@@ -20,6 +20,10 @@ export async function GET(request, { params }) {
         product.images = JSON.parse(product.images || '[]');
         product.tags = JSON.parse(product.tags || '[]');
 
+        const stats = db.prepare('SELECT COUNT(*) as review_count, ROUND(AVG(rating), 1) as avg_rating FROM reviews WHERE product_id = ?').get(product.id);
+        product.avg_rating = stats.avg_rating || 0;
+        product.review_count = stats.review_count || 0;
+
         return NextResponse.json({ product });
     } catch (err) {
         console.error('Product detail error:', err);

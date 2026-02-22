@@ -32,7 +32,7 @@ export async function POST(request) {
         const user = getUserFromRequest(request);
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const { address, delivery_date, notes, utr } = await request.json();
+        const { address, delivery_date, notes, utr, gift_wrap, gift_message } = await request.json();
 
         if (!address) return NextResponse.json({ error: 'Delivery address required' }, { status: 400 });
         if (!utr || utr.length < 10) return NextResponse.json({ error: 'Valid UTR (min 10 digits) required' }, { status: 400 });
@@ -41,7 +41,7 @@ export async function POST(request) {
 
         // Get cart items
         const cartItems = db.prepare(`
-      SELECT ci.quantity, p.id, p.name, p.price, p.stock, p.hero_image, p.weight, p.unit
+      SELECT ci.quantity, p.id, p.name, p.price, p.stock, p.hero_image, p.weight, p.unit, p.shipping_scope
       FROM cart_items ci
       JOIN products p ON ci.product_id = p.id
       WHERE ci.user_id = ?
@@ -53,6 +53,16 @@ export async function POST(request) {
         for (const item of cartItems) {
             if (item.quantity > item.stock) {
                 return NextResponse.json({ error: `${item.name} has insufficient stock` }, { status: 400 });
+            }
+        }
+
+        // Check shipping restrictions for international orders
+        const isInternationalAddr = address.country && address.country.toLowerCase() !== 'india';
+        if (isInternationalAddr) {
+            const indiaOnlyItems = cartItems.filter(item => item.shipping_scope === 'india_only');
+            if (indiaOnlyItems.length > 0) {
+                const names = indiaOnlyItems.map(i => i.name).join(', ');
+                return NextResponse.json({ error: `Cannot ship internationally: ${names} — available only within India` }, { status: 400 });
             }
         }
 
@@ -69,7 +79,7 @@ export async function POST(request) {
             shipping = domesticShipping;
         }
 
-        const total = subtotal + shipping;
+        const total = subtotal + shipping + (gift_wrap ? 49 : 0);
         const orderId = 'SUS-' + uuidv4().split('-')[0].toUpperCase();
 
         const items = cartItems.map(ci => ({
@@ -84,11 +94,12 @@ export async function POST(request) {
 
         // Insert order
         const result = db.prepare(`
-      INSERT INTO orders (order_id, user_id, items, subtotal, shipping, total, utr, delivery_date, address, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO orders (order_id, user_id, items, subtotal, shipping, total, utr, delivery_date, address, notes, gift_wrap, gift_message)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
             orderId, user.id, JSON.stringify(items), subtotal, shipping, total,
-            utr, delivery_date || null, JSON.stringify(address), notes || null
+            utr, delivery_date || null, JSON.stringify(address), notes || null,
+            gift_wrap ? 1 : 0, gift_wrap ? (gift_message || null) : null
         );
 
         // Decrease stock
@@ -110,6 +121,8 @@ export async function POST(request) {
             utr,
             delivery_date,
             address,
+            gift_wrap: gift_wrap ? true : false,
+            gift_message: gift_wrap ? gift_message : null,
         };
 
         const telegramMsgId = await sendOrderNotification(order);

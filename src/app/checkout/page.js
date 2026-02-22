@@ -24,13 +24,27 @@ export default function CheckoutPage() {
     const [utr, setUtr] = useState('');
     const [orderResult, setOrderResult] = useState(null);
     const [submitting, setSubmitting] = useState(false);
+    const [isGift, setIsGift] = useState(false);
+    const [giftMessage, setGiftMessage] = useState('');
+    const [giftOccasion, setGiftOccasion] = useState('Birthday');
+    const [giftRecipient, setGiftRecipient] = useState('');
+    const [generatingMsg, setGeneratingMsg] = useState(false);
+    const [messageEditing, setMessageEditing] = useState(false);
 
     // New address form
     const [showNewAddr, setShowNewAddr] = useState(false);
     const [newAddr, setNewAddr] = useState({ label: 'Home', name: '', phone: '', line1: '', line2: '', city: '', state: '', pincode: '', country: 'India' });
 
+    const canGiftWrap = items.some(item => item.category !== 'Cold-Pressed Oils');
+
+    // Auto-disable gift option if cart becomes ineligible 
+    useEffect(() => {
+        if (!canGiftWrap && isGift) setIsGift(false);
+    }, [canGiftWrap, isGift]);
+
     const shipping = subtotal >= 500 ? 0 : 60;
-    const total = subtotal + shipping;
+    const giftCharge = isGift ? 49 : 0;
+    const total = subtotal + shipping + giftCharge;
 
     useEffect(() => {
         if (!user) { router.push('/auth/login'); return; }
@@ -95,6 +109,8 @@ export default function CheckoutPage() {
                     delivery_date: deliveryDate || null,
                     notes: notes || null,
                     utr: utr.replace(/\s/g, ''),
+                    gift_wrap: isGift,
+                    gift_message: isGift ? giftMessage : null,
                 }),
             });
 
@@ -326,6 +342,111 @@ export default function CheckoutPage() {
                                         onChange={e => setNotes(e.target.value)}
                                         style={{ minHeight: '80px' }}
                                     />
+
+                                    {canGiftWrap && (
+                                        <>
+                                            <hr style={{ margin: '1.5rem 0', border: 'none', borderTop: '1px solid var(--cream-dark)' }} />
+
+                                            <h3 style={{ marginBottom: '0.75rem' }}>🎁 Gift Options</h3>
+                                            <label style={{
+                                                display: 'flex', gap: '0.75rem', padding: '1rem', borderRadius: 'var(--radius-md)',
+                                                border: `2px solid ${isGift ? 'var(--gold)' : 'rgba(197,165,90,0.15)'}`,
+                                                cursor: 'pointer', transition: 'all 0.2s',
+                                                background: isGift ? 'var(--cream)' : 'transparent', alignItems: 'flex-start'
+                                            }}>
+                                                <input type="checkbox" checked={isGift} onChange={e => setIsGift(e.target.checked)} style={{ accentColor: 'var(--gold)', marginTop: '3px' }} />
+                                                <div>
+                                                    <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>Premium Gift Packaging — ₹49</div>
+                                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                                        Beautiful gift wrap with handwritten message card. Perfect for festivals & celebrations!
+                                                    </div>
+                                                </div>
+                                            </label>
+                                            {isGift && (
+                                                <div style={{ marginTop: '0.75rem' }}>
+                                                    <label className="form-label">💌 Gift Message</label>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                                                        <div>
+                                                            <label className="form-label" style={{ fontSize: '0.8rem' }}>Occasion</label>
+                                                            <select className="form-input" value={giftOccasion} onChange={e => setGiftOccasion(e.target.value)}>
+                                                                <option>Birthday</option>
+                                                                <option>Diwali</option>
+                                                                <option>Wedding</option>
+                                                                <option>Anniversary</option>
+                                                                <option>Housewarming</option>
+                                                                <option>Thank You</option>
+                                                                <option>Get Well Soon</option>
+                                                                <option>Congratulations</option>
+                                                                <option>Just Because</option>
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label className="form-label" style={{ fontSize: '0.8rem' }}>Recipient Name</label>
+                                                            <input className="form-input" placeholder="e.g. Amma, Rahul..." value={giftRecipient} onChange={e => setGiftRecipient(e.target.value)} />
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-outline"
+                                                        disabled={generatingMsg}
+                                                        onClick={async () => {
+                                                            setGeneratingMsg(true);
+                                                            setMessageEditing(false);
+                                                            try {
+                                                                const res = await apiFetch('/api/gift-message', {
+                                                                    method: 'POST',
+                                                                    body: JSON.stringify({ occasion: giftOccasion, recipient: giftRecipient || 'someone special' }),
+                                                                });
+                                                                if (res.ok) {
+                                                                    const data = await res.json();
+                                                                    setGiftMessage(data.message);
+                                                                } else {
+                                                                    setGiftMessage('');
+                                                                    setMessageEditing(true);
+                                                                }
+                                                            } catch { setMessageEditing(true); }
+                                                            setGeneratingMsg(false);
+                                                        }}
+                                                        style={{ width: '100%', marginBottom: '0.75rem' }}
+                                                    >
+                                                        {generatingMsg ? '✨ Generating...' : '✨ Generate Message with AI'}
+                                                    </button>
+                                                    {giftMessage && !messageEditing && (
+                                                        <div style={{ padding: '1rem', background: 'rgba(197,165,90,0.08)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(197,165,90,0.2)' }}>
+                                                            <p style={{ fontStyle: 'italic', color: 'var(--text-secondary)', margin: '0 0 0.5rem', lineHeight: 1.6 }}>"{giftMessage}"</p>
+                                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                                <button type="button" className="btn btn-sm btn-outline" onClick={() => setMessageEditing(true)}>✏️ Edit</button>
+                                                                <button type="button" className="btn btn-sm btn-outline" disabled={generatingMsg} onClick={async () => {
+                                                                    setGeneratingMsg(true);
+                                                                    try {
+                                                                        const res = await apiFetch('/api/gift-message', {
+                                                                            method: 'POST',
+                                                                            body: JSON.stringify({ occasion: giftOccasion, recipient: giftRecipient || 'someone special' }),
+                                                                        });
+                                                                        if (res.ok) { const data = await res.json(); setGiftMessage(data.message); }
+                                                                    } catch { }
+                                                                    setGeneratingMsg(false);
+                                                                }}>🔄 Regenerate</button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {(messageEditing || !giftMessage) && (
+                                                        <div>
+                                                            <textarea
+                                                                className="form-input"
+                                                                placeholder="Or type your own message here..."
+                                                                value={giftMessage}
+                                                                onChange={e => setGiftMessage(e.target.value)}
+                                                                maxLength={200}
+                                                                style={{ minHeight: '70px' }}
+                                                            />
+                                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'right' }}>{giftMessage.length}/200</div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
                                 </div>
 
                                 <div style={{ marginTop: '1.5rem' }}>
@@ -351,6 +472,12 @@ export default function CheckoutPage() {
                                     <span>Shipping</span>
                                     <span style={{ color: shipping === 0 ? 'var(--success)' : '' }}>{shipping === 0 ? 'FREE' : `₹${shipping}`}</span>
                                 </div>
+                                {isGift && (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                        <span>🎁 Gift Packaging</span>
+                                        <span>₹49</span>
+                                    </div>
+                                )}
                                 <hr style={{ margin: '1rem 0', border: 'none', borderTop: '1px solid var(--cream-dark)' }} />
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1.15rem' }}>
                                     <span>Total</span><span style={{ color: 'var(--gold-dark)' }}>₹{total.toFixed(2)}</span>

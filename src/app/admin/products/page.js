@@ -12,7 +12,8 @@ export default function AdminProductsPage() {
     const [form, setForm] = useState({
         name: '', description: '', short_description: '', category: 'Sweets',
         price: '', compare_price: '', weight: '', unit: 'g',
-        shelf_life_days: 30, stock: 0, status: 'active', is_preorder: false
+        shelf_life_days: 30, stock: 0, status: 'active', is_preorder: false,
+        shipping_scope: 'exportable', is_subscribable: false
     });
     const { toasts, addToast, removeToast } = useToast();
 
@@ -31,7 +32,8 @@ export default function AdminProductsPage() {
         setForm({
             name: '', description: '', short_description: '', category: 'Sweets',
             price: '', compare_price: '', weight: '', unit: 'g',
-            shelf_life_days: 30, stock: 0, status: 'active', is_preorder: false
+            shelf_life_days: 30, stock: 0, status: 'active', is_preorder: false,
+            shipping_scope: 'exportable', is_subscribable: false
         });
         setEditingId(null);
         setShowForm(false);
@@ -42,7 +44,8 @@ export default function AdminProductsPage() {
             name: p.name, description: p.description || '', short_description: p.short_description || '',
             category: p.category, price: p.price, compare_price: p.compare_price || '',
             weight: p.weight || '', unit: p.unit || 'g', shelf_life_days: p.shelf_life_days || 30,
-            stock: p.stock, status: p.status, is_preorder: !!p.is_preorder
+            stock: p.stock, status: p.status, is_preorder: !!p.is_preorder,
+            shipping_scope: p.shipping_scope || 'exportable', is_subscribable: !!p.is_subscribable
         });
         setEditingId(p.id);
         setShowForm(true);
@@ -148,6 +151,17 @@ export default function AdminProductsPage() {
                             <input type="checkbox" checked={form.is_preorder} onChange={e => setForm({ ...form, is_preorder: e.target.checked })} id="preorder" style={{ accentColor: 'var(--gold)' }} />
                             <label htmlFor="preorder" style={{ fontWeight: 500 }}>Pre-Order</label>
                         </div>
+                        <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <input type="checkbox" checked={form.is_subscribable} onChange={e => setForm({ ...form, is_subscribable: e.target.checked })} id="subscribable" style={{ accentColor: 'var(--gold)' }} />
+                            <label htmlFor="subscribable" style={{ fontWeight: 500 }}>🔄 Subscribable</label>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Shipping Scope</label>
+                            <select className="form-input" value={form.shipping_scope} onChange={e => setForm({ ...form, shipping_scope: e.target.value })}>
+                                <option value="exportable">🌍 Exportable</option>
+                                <option value="india_only">🇮🇳 Only India</option>
+                            </select>
+                        </div>
                     </div>
                     <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
                         <button type="submit" className="btn btn-primary">{editingId ? 'Update' : 'Create'} Product</button>
@@ -168,6 +182,7 @@ export default function AdminProductsPage() {
                             <th>Stock</th>
                             <th>Shelf Life</th>
                             <th>Status</th>
+                            <th>Shipping</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -177,6 +192,7 @@ export default function AdminProductsPage() {
                                 <td>
                                     <strong>{p.name}</strong>
                                     {p.is_preorder ? <span className="product-badge badge-preorder" style={{ position: 'static', marginLeft: '0.5rem' }}>PRE</span> : null}
+                                    {p.is_subscribable ? <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--gold-dark)' }}>🔄 Sub</span> : null}
                                 </td>
                                 <td>{p.category}</td>
                                 <td>
@@ -192,6 +208,11 @@ export default function AdminProductsPage() {
                                 <td>
                                     <span className={`status-badge ${p.status === 'active' ? 'status-processing' : 'status-cancelled'}`}>
                                         {p.status}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span style={{ fontSize: '0.85rem', fontWeight: 500, color: p.shipping_scope === 'india_only' ? 'var(--danger)' : 'var(--success)' }}>
+                                        {p.shipping_scope === 'india_only' ? '🇮🇳 India' : '🌍 Export'}
                                     </span>
                                 </td>
                                 <td>

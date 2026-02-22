@@ -15,6 +15,8 @@ async function sendOrderNotification(order) {
         .map((item, i) => `  ${i + 1}. ${item.name} × ${item.quantity} — ₹${(item.price * item.quantity).toFixed(2)}`)
         .join('\n');
 
+    const giftInfo = order.gift_wrap ? `\n🎁 *Gift Wrapped:* Yes${order.gift_message ? `\n💌 *Gift Message:* ${order.gift_message}` : ''}` : '';
+
     const message = `🛒 *NEW ORDER RECEIVED*
 
 📋 *Order ID:* \`${order.order_id}\`
@@ -25,7 +27,7 @@ ${itemsList}
 💰 *Subtotal:* ₹${order.subtotal.toFixed(2)}
 🚚 *Shipping:* ₹${order.shipping.toFixed(2)}
 *💵 Total:* ₹${order.total.toFixed(2)}
-
+${giftInfo}
 🔑 *UTR:* \`${order.utr || 'Not provided'}\`
 
 👤 *Customer:* ${address.name}

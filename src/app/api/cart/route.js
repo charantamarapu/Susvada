@@ -10,7 +10,7 @@ export async function GET(request) {
         const db = getDb();
         const items = db.prepare(`
       SELECT ci.id, ci.quantity, ci.product_id,
-             p.name, p.price, p.compare_price, p.hero_image, p.stock, p.weight, p.unit, p.slug
+             p.name, p.price, p.compare_price, p.hero_image, p.stock, p.weight, p.unit, p.slug, p.category
       FROM cart_items ci
       JOIN products p ON ci.product_id = p.id
       WHERE ci.user_id = ?

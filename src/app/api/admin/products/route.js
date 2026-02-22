@@ -32,7 +32,7 @@ export async function POST(request) {
         const {
             name, description, short_description, category, price, compare_price,
             weight, unit, shelf_life_days, manufactured_date, is_preorder, preorder_date,
-            stock, status, hero_image, images, tags
+            stock, status, hero_image, images, tags, shipping_scope, is_subscribable
         } = body;
 
         if (!name || !category || !price) {
@@ -45,13 +45,14 @@ export async function POST(request) {
         const result = db.prepare(`
       INSERT INTO products (name, slug, description, short_description, category, price, compare_price,
         weight, unit, shelf_life_days, manufactured_date, is_preorder, preorder_date,
-        stock, status, hero_image, images, tags)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        stock, status, hero_image, images, tags, shipping_scope, is_subscribable)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
             name, slug, description || '', short_description || '', category, price, compare_price || null,
             weight || '', unit || 'g', shelf_life_days || 30, manufactured_date || null,
             is_preorder ? 1 : 0, preorder_date || null, stock || 0, status || 'active',
-            hero_image || '', JSON.stringify(images || []), JSON.stringify(tags || [])
+            hero_image || '', JSON.stringify(images || []), JSON.stringify(tags || []),
+            shipping_scope || 'exportable', is_subscribable ? 1 : 0
         );
 
         return NextResponse.json({ success: true, id: result.lastInsertRowid, slug });
@@ -81,13 +82,13 @@ export async function PUT(request) {
         const allowedFields = [
             'name', 'description', 'short_description', 'category', 'price', 'compare_price',
             'weight', 'unit', 'shelf_life_days', 'manufactured_date', 'is_preorder', 'preorder_date',
-            'stock', 'status', 'hero_image'
+            'stock', 'status', 'hero_image', 'shipping_scope', 'is_subscribable'
         ];
 
         for (const field of allowedFields) {
             if (fields[field] !== undefined) {
                 updates.push(`${field} = ?`);
-                params.push(field === 'is_preorder' ? (fields[field] ? 1 : 0) : fields[field]);
+                params.push((field === 'is_preorder' || field === 'is_subscribable') ? (fields[field] ? 1 : 0) : fields[field]);
             }
         }
 

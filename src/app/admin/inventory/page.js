@@ -75,7 +75,7 @@ export default function AdminInventoryPage() {
             </div>
 
             <div style={{ background: 'var(--cream)', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-                <strong>💡 Bulk Import Instructions:</strong> Upload an Excel/CSV file with columns: <code>id</code>, <code>name</code>, <code>category</code>, <code>price</code>, <code>stock</code>, <code>shelf_life_days</code>, <code>manufactured_date</code>.
+                <strong>💡 Bulk Import Instructions:</strong> Upload an Excel/CSV file with columns: <code>id</code>, <code>name</code>, <code>category</code>, <code>price</code>, <code>stock</code>, <code>shelf_life_days</code>, <code>manufactured_date</code>, <code>shipping_scope</code> (<code>exportable</code> or <code>india_only</code>, default: <code>exportable</code>).
                 Rows with an <code>id</code> will update existing products. Rows without <code>id</code> (but with name, category, price) will create new products.
             </div>
 
@@ -100,6 +100,7 @@ export default function AdminInventoryPage() {
                                 <th>Stock</th>
                                 <th>Shelf Life</th>
                                 <th>Status</th>
+                                <th>Shipping</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -120,6 +121,11 @@ export default function AdminInventoryPage() {
                                     <td>{p.shelf_life_days} days</td>
                                     <td>
                                         <span className={`status-badge ${p.status === 'active' ? 'status-processing' : 'status-cancelled'}`}>{p.status}</span>
+                                    </td>
+                                    <td>
+                                        <span style={{ fontSize: '0.85rem', fontWeight: 500, color: p.shipping_scope === 'india_only' ? 'var(--danger)' : 'var(--success)' }}>
+                                            {p.shipping_scope === 'india_only' ? '🇮🇳 India Only' : '🌍 Exportable'}
+                                        </span>
                                     </td>
                                 </tr>
                             ))}

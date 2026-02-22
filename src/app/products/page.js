@@ -127,6 +127,14 @@ function ProductsContent() {
                                         <Link href={`/product/${product.slug}`}>
                                             <h3 className="product-name">{product.name}</h3>
                                         </Link>
+                                        {product.avg_rating > 0 && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.25rem' }}>
+                                                <span style={{ color: 'var(--gold)', fontSize: '0.85rem', letterSpacing: '1px' }}>
+                                                    {'★'.repeat(Math.round(product.avg_rating))}{'☆'.repeat(5 - Math.round(product.avg_rating))}
+                                                </span>
+                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>({product.review_count})</span>
+                                            </div>
+                                        )}
                                         <p className="product-desc">{product.short_description}</p>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
                                             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>

@@ -45,6 +45,7 @@ export default function AccountPage() {
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState('orders');
     const [addresses, setAddresses] = useState([]);
+    const [subscriptions, setSubscriptions] = useState([]);
 
     const [cancelModal, setCancelModal] = useState(null);
     const [cancelReason, setCancelReason] = useState('');
@@ -66,6 +67,7 @@ export default function AccountPage() {
         if (!user) { router.push('/auth/login'); return; }
         fetchOrders();
         fetchAddresses();
+        fetchSubscriptions();
     }, [user]);
 
     const fetchOrders = async () => {
@@ -82,6 +84,14 @@ export default function AccountPage() {
         if (res.ok) {
             const data = await res.json();
             setAddresses(data.addresses);
+        }
+    };
+
+    const fetchSubscriptions = async () => {
+        const res = await apiFetch('/api/subscriptions');
+        if (res.ok) {
+            const data = await res.json();
+            setSubscriptions(data.subscriptions || []);
         }
     };
 
@@ -179,6 +189,7 @@ export default function AccountPage() {
                     <div className="account-layout">
                         <div className="account-sidebar">
                             <a className={tab === 'orders' ? 'active' : ''} onClick={() => setTab('orders')} style={{ cursor: 'pointer' }}>📦 My Orders</a>
+                            <a className={tab === 'subscriptions' ? 'active' : ''} onClick={() => setTab('subscriptions')} style={{ cursor: 'pointer' }}>🔄 Subscriptions</a>
                             <a className={tab === 'addresses' ? 'active' : ''} onClick={() => setTab('addresses')} style={{ cursor: 'pointer' }}>📍 Addresses</a>
                             <a className={tab === 'profile' ? 'active' : ''} onClick={() => setTab('profile')} style={{ cursor: 'pointer' }}>👤 Profile</a>
                             <a onClick={logout} style={{ cursor: 'pointer', color: 'var(--danger)' }}>🚪 Logout</a>
@@ -225,11 +236,19 @@ export default function AccountPage() {
                                                         </div>
 
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                            <strong style={{ color: 'var(--gold-dark)', fontSize: '1.1rem' }}>₹{order.total.toFixed(2)}</strong>
+                                                            <div>
+                                                                <strong style={{ color: 'var(--gold-dark)', fontSize: '1.1rem' }}>₹{order.total.toFixed(2)}</strong>
+                                                                {order.gift_wrap ? <span style={{ marginLeft: '0.75rem', fontSize: '0.85rem', color: 'var(--gold-dark)', fontWeight: 600 }}>🎁 Gift Wrapped</span> : null}
+                                                            </div>
                                                             {canCancel(order.status) && (
                                                                 <button className="btn btn-sm btn-danger" onClick={() => openCancelModal(order)}>Cancel Order</button>
                                                             )}
                                                         </div>
+                                                        {order.gift_wrap && order.gift_message && (
+                                                            <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.75rem', background: 'rgba(197,165,90,0.08)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                                                💌 "{order.gift_message}"
+                                                            </div>
+                                                        )}
 
                                                         {order.status === 'cancelled' && order.refund_status === 'pending' && (
                                                             <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(255,193,7,0.1)', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--gold-dark)' }}>
@@ -272,6 +291,68 @@ export default function AccountPage() {
                                                                 UTR: <code>{order.utr}</code>
                                                             </div>
                                                         )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Subscriptions Tab */}
+                            {tab === 'subscriptions' && (
+                                <div>
+                                    <h2 style={{ marginBottom: '1.5rem' }}>My Subscriptions</h2>
+                                    {subscriptions.length === 0 ? (
+                                        <div className="empty-state">
+                                            <div className="empty-icon">🔄</div>
+                                            <h3>No active subscriptions</h3>
+                                            <p>Subscribe to your favourite products to save 5% and never run out!</p>
+                                            <Link href="/products" className="btn btn-primary">Browse Products</Link>
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                            {subscriptions.map(sub => {
+                                                const freqLabel = { monthly: 'Monthly', bimonthly: 'Every 2 Months', quarterly: 'Quarterly' }[sub.frequency];
+                                                const discountedPrice = Math.round(sub.product_price * 0.95 * sub.quantity);
+                                                return (
+                                                    <div key={sub.id} className="card" style={{ padding: '1.5rem' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
+                                                            <div>
+                                                                <Link href={`/product/${sub.slug}`} style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)' }}>
+                                                                    {sub.product_name}
+                                                                </Link>
+                                                                <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                                                                    {sub.weight}{sub.unit} × {sub.quantity}
+                                                                </div>
+                                                            </div>
+                                                            <span className={`status-badge ${sub.status === 'active' ? 'status-processing' : 'status-pending'}`}>
+                                                                {sub.status === 'active' ? '✅ Active' : '⏸️ Paused'}
+                                                            </span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.75rem', fontSize: '0.9rem', flexWrap: 'wrap' }}>
+                                                            <div><strong>Frequency:</strong> {freqLabel}</div>
+                                                            <div><strong>Next delivery:</strong> {sub.next_delivery ? new Date(sub.next_delivery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'TBD'}</div>
+                                                            <div><strong>Price:</strong> <span style={{ color: 'var(--gold-dark)', fontWeight: 700 }}>₹{discountedPrice}</span> <span style={{ fontSize: '0.8rem', color: 'var(--success)' }}>(5% off)</span></div>
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                                                            {sub.status === 'active' ? (
+                                                                <button className="btn btn-sm btn-outline" onClick={async () => {
+                                                                    await apiFetch('/api/subscriptions', { method: 'PUT', body: JSON.stringify({ id: sub.id, action: 'pause' }) });
+                                                                    fetchSubscriptions();
+                                                                }}>⏸️ Pause</button>
+                                                            ) : (
+                                                                <button className="btn btn-sm btn-primary" onClick={async () => {
+                                                                    await apiFetch('/api/subscriptions', { method: 'PUT', body: JSON.stringify({ id: sub.id, action: 'resume' }) });
+                                                                    fetchSubscriptions();
+                                                                }}>▶️ Resume</button>
+                                                            )}
+                                                            <button className="btn btn-sm btn-danger" onClick={async () => {
+                                                                if (!confirm('Cancel this subscription?')) return;
+                                                                await apiFetch(`/api/subscriptions?id=${sub.id}`, { method: 'DELETE' });
+                                                                fetchSubscriptions();
+                                                            }}>Cancel</button>
+                                                        </div>
                                                     </div>
                                                 );
                                             })}

@@ -26,11 +26,21 @@ export async function GET(request) {
 
         const products = db.prepare(query).all(...params);
 
+        // Get review stats for all products in one go
+        const reviewStats = db.prepare(`
+            SELECT product_id, COUNT(*) as review_count, ROUND(AVG(rating), 1) as avg_rating
+            FROM reviews GROUP BY product_id
+        `).all();
+        const statsMap = {};
+        for (const s of reviewStats) statsMap[s.product_id] = s;
+
         // Parse JSON fields
         const parsed = products.map(p => ({
             ...p,
             images: JSON.parse(p.images || '[]'),
             tags: JSON.parse(p.tags || '[]'),
+            avg_rating: statsMap[p.id]?.avg_rating || 0,
+            review_count: statsMap[p.id]?.review_count || 0,
         }));
 
         return NextResponse.json({ products: parsed });

@@ -72,6 +72,8 @@ function initializeDb(database) {
       hero_image TEXT,
       images TEXT DEFAULT '[]',
       tags TEXT DEFAULT '[]',
+      shipping_scope TEXT DEFAULT 'exportable' CHECK(shipping_scope IN ('exportable', 'india_only')),
+      is_subscribable INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -94,6 +96,8 @@ function initializeDb(database) {
       refund_status TEXT DEFAULT 'none' CHECK(refund_status IN ('none', 'pending', 'processed')),
       tracking_id TEXT,
       tracking_url TEXT,
+      gift_wrap INTEGER DEFAULT 0,
+      gift_message TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
@@ -142,6 +146,32 @@ function initializeDb(database) {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      product_id INTEGER NOT NULL,
+      rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+      review_text TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+      UNIQUE(user_id, product_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      product_id INTEGER NOT NULL,
+      frequency TEXT NOT NULL CHECK(frequency IN ('monthly', 'bimonthly', 'quarterly')),
+      quantity INTEGER DEFAULT 1,
+      discount_percent REAL DEFAULT 5,
+      status TEXT DEFAULT 'active' CHECK(status IN ('active', 'paused', 'cancelled')),
+      next_delivery DATE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    );
+
     -- Indexes
     CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
     CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
@@ -149,7 +179,20 @@ function initializeDb(database) {
     CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
     CREATE INDEX IF NOT EXISTS idx_cart_user ON cart_items(user_id);
     CREATE INDEX IF NOT EXISTS idx_addresses_user ON addresses(user_id);
+    CREATE INDEX IF NOT EXISTS idx_reviews_product ON reviews(product_id);
+    CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);
   `);
+
+    // Migrations for existing databases
+    const migrations = [
+        `ALTER TABLE products ADD COLUMN shipping_scope TEXT DEFAULT 'exportable' CHECK(shipping_scope IN ('exportable', 'india_only'))`,
+        `ALTER TABLE products ADD COLUMN is_subscribable INTEGER DEFAULT 0`,
+        `ALTER TABLE orders ADD COLUMN gift_wrap INTEGER DEFAULT 0`,
+        `ALTER TABLE orders ADD COLUMN gift_message TEXT`,
+    ];
+    for (const sql of migrations) {
+        try { database.exec(sql); } catch (e) { /* column already exists */ }
+    }
 
     // Seed default settings if not exist
     const insertSetting = database.prepare(

@@ -9,7 +9,7 @@ export async function GET(request) {
         if (!user || user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
         const db = getDb();
-        const products = db.prepare('SELECT id, name, category, price, stock, shelf_life_days, manufactured_date, status FROM products ORDER BY name').all();
+        const products = db.prepare('SELECT id, name, category, price, stock, shelf_life_days, manufactured_date, shipping_scope, is_subscribable, status FROM products ORDER BY name').all();
 
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(products);
@@ -48,20 +48,20 @@ export async function POST(request) {
         let updated = 0;
         let created = 0;
 
-        const updateStmt = db.prepare('UPDATE products SET stock = ?, price = ?, manufactured_date = ?, shelf_life_days = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+        const updateStmt = db.prepare('UPDATE products SET stock = ?, price = ?, manufactured_date = ?, shelf_life_days = ?, shipping_scope = ?, is_subscribable = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
         const insertStmt = db.prepare(`
-      INSERT INTO products (name, slug, category, price, stock, shelf_life_days, manufactured_date, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'active')
+      INSERT INTO products (name, slug, category, price, stock, shelf_life_days, manufactured_date, shipping_scope, is_subscribable, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
     `);
 
         const tx = db.transaction(() => {
             for (const row of data) {
                 if (row.id) {
-                    updateStmt.run(row.stock || 0, row.price || 0, row.manufactured_date || null, row.shelf_life_days || 30, row.id);
+                    updateStmt.run(row.stock || 0, row.price || 0, row.manufactured_date || null, row.shelf_life_days || 30, row.shipping_scope || 'exportable', row.is_subscribable ? 1 : 0, row.id);
                     updated++;
                 } else if (row.name && row.category && row.price) {
                     const slug = row.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-                    insertStmt.run(row.name, slug, row.category, row.price, row.stock || 0, row.shelf_life_days || 30, row.manufactured_date || null);
+                    insertStmt.run(row.name, slug, row.category, row.price, row.stock || 0, row.shelf_life_days || 30, row.manufactured_date || null, row.shipping_scope || 'exportable', row.is_subscribable ? 1 : 0);
                     created++;
                 }
             }
